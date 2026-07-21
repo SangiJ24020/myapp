@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J24020のアプリ</title>
+  <script src="utils.js"></script>
+  <script>
+    // ログイン状態を確認して遷移
+    window.addEventListener('DOMContentLoaded', () => {
+      const token = getCookie('session_token');
+      if (token) {
+        window.location.href = 'app.html';
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+  </script>
+</head>
+<body style="background: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #6b7280;">
+  <div>読み込み中...</div>
+</body>
+</html>

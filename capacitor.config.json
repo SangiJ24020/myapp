@@ -1,0 +1,8 @@
+{
+  "appId": "com.j24020.myapp",
+  "appName": "J24020のアプリ",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  }
+}

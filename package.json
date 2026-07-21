@@ -1,0 +1,14 @@
+{
+  "name": "myapp",
+  "version": "1.0.0",
+  "description": "J24020のアプリ - タスク管理 & AIアシスタント",
+  "scripts": {
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.0.0"
+  }
+}

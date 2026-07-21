@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J24020のアプリ</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="utils.js"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide アイコン CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div class="phone-container">
+    
+    <!-- 1. アプリ共通ヘッダー -->
+    <header class="app-header">
+      <div class="user-info">
+        <div class="user-avatar" id="header-avatar">Y</div>
+        <div class="user-text">
+          <p style="font-size: 0.7rem; color: var(--text-muted);">おはようございます☀️</p>
+          <h4 id="header-user-name">山田 太郎さん</h4>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="openSettingsView()" title="設定">
+          <i data-lucide="settings"></i>
+        </button>
+        <button class="icon-btn" onclick="handleLogout()" title="ログアウト" style="color: var(--danger-color); border-color: var(--danger-light);">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. メインコンテンツ（スクロール可能） -->
+    <main class="app-content" id="app-main-content">
+      
+      <!-- ==================== 🏠 ダッシュボード画面 ==================== -->
+      <section id="view-dashboard" class="view-section">
+        <h2 class="dashboard-title">ダッシュボード</h2>
+        
+        <!-- 今日の進捗カード -->
+        <div class="progress-card">
+          <div class="progress-card-info">
+            <p>今日のタスク</p>
+            <h3 id="dash-task-count">0 件</h3>
+            <p id="dash-task-detail">完了 0件 / 残り 0件</p>
+          </div>
+          <div class="circle-progress">
+            <svg>
+              <circle class="bg" cx="40" cy="40" r="36" />
+              <circle class="bar" cx="40" cy="40" r="36" id="dash-circle-bar" />
+            </svg>
+            <div class="percent" id="dash-circle-percent">0%</div>
+          </div>
+        </div>
+
+        <!-- クイックステータス -->
+        <div class="status-grid">
+          <div class="status-card doing">
+            <div class="status-icon"><i data-lucide="play" style="width: 16px; height: 16px;"></i></div>
+            <div class="status-num" id="dash-num-doing">0</div>
+            <div class="status-label">進行中</div>
+          </div>
+          <div class="status-card done">
+            <div class="status-icon"><i data-lucide="check" style="width: 16px; height: 16px;"></i></div>
+            <div class="status-num" id="dash-num-done">0</div>
+            <div class="status-label">完了</div>
+          </div>
+          <div class="status-card overdue">
+            <div class="status-icon"><i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i></div>
+            <div class="status-num" id="dash-num-overdue" style="color: var(--danger-color);">0</div>
+            <div class="status-label">期限切れ</div>
+          </div>
+        </div>
+
+        <!-- プロジェクト進捗概要 -->
+        <div class="section-header">
+          <h3 class="section-title">プロジェクトの概要</h3>
+          <a href="#" class="section-link" onclick="switchTab('tasks')">すべて見る ></a>
+        </div>
+        
+        <div class="project-list" id="dash-project-list">
+          <!-- JSで動的に追加 -->
+          <div class="project-card" style="justify-content: center; color: var(--text-muted); font-size: 0.8rem;">
+            プロジェクトを読み込み中...
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ==================== ✅ タスク一覧画面 ==================== -->
+      <section id="view-tasks" class="view-section hidden">
+        <h2 class="dashboard-title">タスク一覧</h2>
+        
+        <!-- フィルタータブ -->
+        <div class="filter-tabs">
+          <div class="filter-tab active" onclick="filterTasks('all')" id="tab-filter-all">すべて</div>
+          <div class="filter-tab" onclick="filterTasks('todo')" id="tab-filter-todo">未着手</div>
+          <div class="filter-tab" onclick="filterTasks('doing')" id="tab-filter-doing">進行中</div>
+          <div class="filter-tab" onclick="filterTasks('done')" id="tab-filter-done">完了</div>
+        </div>
+
+        <!-- タスクリスト -->
+        <div id="task-list-container">
+          <!-- グループごとにJSで動的配置 -->
+          <div class="project-card" style="justify-content: center; color: var(--text-muted); font-size: 0.8rem;">
+            タスクを読み込み中...
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ==================== 🤖 AI アシスタント画面 ==================== -->
+      <section id="view-ai" class="view-section hidden">
+        <h2 class="dashboard-title">AIアシスタント</h2>
+        
+        <div class="ai-intro">
+          <div class="ai-avatar-large">
+            <i data-lucide="bot" style="width: 36px; height: 36px;"></i>
+          </div>
+          <h3>こんにちは、AIアシスタントです🤖</h3>
+          <p>タスク管理や目標設定についてお手伝いします！</p>
+        </div>
+
+        <!-- チャットログ -->
+        <div class="chat-container" id="chat-log">
+          <div class="chat-bubble ai">
+            何かお手伝いできることはありますか？<br>
+            「今日のスケジュールを整理して」「タスクの優先順位を提案して」など、何でも聞いてくださいね。
+          </div>
+        </div>
+
+        <!-- 送信フォーム -->
+        <div class="chat-input-area">
+          <input type="text" id="chat-input-text" class="chat-input" placeholder="AIに質問する..." onkeypress="handleChatKeyPress(event)">
+          <button class="btn-send" onclick="sendChatMessage()">
+            <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+      </section>
+
+
+      <!-- ==================== 📊 分析・レポート画面 ==================== -->
+      <section id="view-report" class="view-section hidden">
+        <h2 class="dashboard-title">分析・レポート</h2>
+
+        <!-- 簡易実績統計 -->
+        <div class="stats-grid">
+          <div class="stat-item-box">
+            <h5>完了タスク数</h5>
+            <div class="val" id="report-done-count">0</div>
+            <div class="sub">✨ 今週も順調です！</div>
+          </div>
+          <div class="stat-item-box">
+            <h5>生産性スコア</h5>
+            <div class="val" id="report-productivity-score">0 / 100</div>
+            <div class="sub" style="color: var(--primary-color);">📈 前週比向上中</div>
+          </div>
+        </div>
+
+        <!-- 生産性の推移グラフ (折れ線グラフ) -->
+        <div class="chart-card">
+          <h4>週別生産性の推移 (完了タスク数)</h4>
+          <div class="chart-wrapper">
+            <canvas id="productivityChart"></canvas>
+          </div>
+        </div>
+
+        <!-- タスクのステータス比率 (ドーナツグラフ) -->
+        <div class="chart-card">
+          <h4>タスクのステータス</h4>
+          <div class="chart-wrapper">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ==================== ⚙️ 設定画面 ==================== -->
+      <section id="view-settings" class="view-section hidden">
+        <h2 class="dashboard-title">設定</h2>
+        
+        <div class="settings-list">
+          <div class="settings-card">
+            <h4>アカウント情報</h4>
+            <div class="settings-item">
+              <label>お名前</label>
+              <span class="val-text" id="settings-name">-</span>
+            </div>
+            <div class="settings-item">
+              <label>メールアドレス</label>
+              <span class="val-text" id="settings-email">-</span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h4>システム連携</h4>
+            <div class="settings-item">
+              <label>GAS連携状態</label>
+              <span class="val-text" id="settings-gas-status" style="color: var(--secondary-color); font-weight: 600;">接続完了</span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4;">
+              <p>スプレッドシート「個人製作」と連動し、データは常にクラウド上に安全に保存されています。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 3. タスク追加・編集用ハーフモーダル -->
+    <div class="modal-overlay" id="task-modal" onclick="closeTaskModal(event)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3 class="modal-title" id="modal-title-text">タスクの作成</h3>
+          <button class="icon-btn" onclick="closeTaskModal(event)" style="border: none;">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <form id="task-form" onsubmit="saveTaskData(event)">
+          <input type="hidden" id="task-id">
+          
+          <div class="form-group">
+            <label for="task-title">タスク名</label>
+            <input type="text" id="task-title" class="form-input" placeholder="タスクの名前を入力" required>
+          </div>
+
+          <div class="form-group">
+            <label for="task-project">プロジェクト</label>
+            <select id="task-project" class="form-input" required style="-webkit-appearance: none;">
+              <!-- JSで動的に追加 -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="task-status">ステータス</label>
+            <select id="task-status" class="form-input" required>
+              <option value="todo">未着手</option>
+              <option value="doing">進行中</option>
+              <option value="done">完了</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="task-due">期限日</label>
+            <input type="date" id="task-due" class="form-input" required>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="button" id="btn-delete-task" class="btn" style="background-color: var(--danger-light); color: var(--danger-color); display: none;" onclick="deleteTaskData()">
+              <i data-lucide="trash-2"></i>
+              <span>削除</span>
+            </button>
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+              <i data-lucide="check"></i>
+              <span>保存する</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 4. 固定下部タブバー -->
+    <nav class="app-nav">
+      <a href="#" class="nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')">
+        <i data-lucide="home"></i>
+        <span>ホーム</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-tasks" onclick="switchTab('tasks')">
+        <i data-lucide="check-square"></i>
+        <span>タスク</span>
+      </a>
+      <!-- 中央の大きな追加ボタン -->
+      <a href="#" class="nav-item nav-item-center" onclick="openAddTaskModal()">
+        <i data-lucide="plus"></i>
+      </a>
+      <a href="#" class="nav-item" id="nav-ai" onclick="switchTab('ai')">
+        <i data-lucide="bot"></i>
+        <span>AI</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-report" onclick="switchTab('report')">
+        <i data-lucide="bar-chart-2"></i>
+        <span>分析</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- メインJS -->
+  <script src="app.js"></script>
+</body>
+</html>

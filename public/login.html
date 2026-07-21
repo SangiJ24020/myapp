@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - J24020のアプリ</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="utils.js"></script>
+</head>
+<body>
+
+  <div class="phone-container">
+    <div class="login-screen">
+      <div class="login-header">
+        <h1>J24020のアプリ</h1>
+        <p>タスク管理 & AIアシスタント</p>
+      </div>
+
+      <div id="error-box" class="error-message"></div>
+
+      <form id="login-form" onsubmit="handleLoginSubmit(event)">
+        <div class="form-group">
+          <label for="email">メールアドレス</label>
+          <input type="email" id="email" class="form-input" placeholder="example@sangi.jp" required value="admin@example.com">
+        </div>
+
+        <div class="form-group">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" class="form-input" placeholder="••••••••" required value="admin">
+        </div>
+
+        <button type="submit" id="btn-login" class="btn btn-primary" style="margin-top: 1.5rem;">
+          <span>ログイン</span>
+        </button>
+      </form>
+
+      <div style="margin-top: 2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+        <p>※ デモ環境用のアカウントが入力されています</p>
+        <p>（管理者: admin@example.com / admin）</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ログイン状態であれば直接 app.html へ
+    if (getCookie('session_token')) {
+      window.location.href = 'app.html';
+    }
+
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorBox = document.getElementById('error-box');
+      const btnLogin = document.getElementById('btn-login');
+
+      errorBox.style.display = 'none';
+      btnLogin.disabled = true;
+      btnLogin.innerHTML = '<span>ログイン中...</span>';
+
+      try {
+        const res = await requestGas({
+          mode: 'login',
+          email: email,
+          password: password
+        });
+
+        if (res.status === 'success') {
+          // セッション情報を保存 (24時間)
+          setCookie('session_token', res.token, 24);
+          setCookie('user_name', res.user.name, 24);
+          setCookie('user_email', res.user.email, 24);
+
+          // メイン画面へ
+          window.location.href = 'app.html';
+        } else {
+          errorBox.innerText = res.message || 'ログインに失敗しました。';
+          errorBox.style.display = 'block';
+        }
+      } catch (err) {
+        console.error(err);
+        errorBox.innerText = 'サーバーとの通信に失敗しました。GASのデプロイURLが正しいか確認してください。';
+        errorBox.style.display = 'block';
+      } finally {
+        btnLogin.disabled = false;
+        btnLogin.innerHTML = '<span>ログイン</span>';
+      }
+    }
+  </script>
+
+</body>
+</html>
