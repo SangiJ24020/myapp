@@ -39,47 +39,61 @@
       
       <!-- ==================== 🏠 ダッシュボード画面 ==================== -->
       <section id="view-dashboard" class="view-section">
-        <h2 class="dashboard-title">ダッシュボード</h2>
+        <h2 class="dashboard-title" id="dash-title" style="cursor: pointer; user-select: none;">ダッシュボード</h2>
         
-        <!-- 今日の進捗カード -->
-        <div class="progress-card">
-          <div class="progress-card-info">
-            <p>今日のタスク</p>
-            <h3 id="dash-task-count">0 件</h3>
-            <p id="dash-task-detail">完了 0件 / 残り 0件</p>
-          </div>
-          <div class="circle-progress">
-            <svg>
-              <circle class="bg" cx="40" cy="40" r="36" />
-              <circle class="bar" cx="40" cy="40" r="36" id="dash-circle-bar" />
-            </svg>
-            <div class="percent" id="dash-circle-percent">0%</div>
+        <!-- ▼ ゲームモード用エリア (通常時は非表示) ▼ -->
+        <div id="game-container" class="hidden">
+          <div class="game-screen" id="game-screen" onclick="jumpGameCharacter()">
+            <div id="game-score">Score: 0</div>
+            <div id="game-msg">タップしてスタート</div>
+            <div id="game-character">🤖</div>
+            <div id="game-obstacle">🌵</div>
+            <div class="game-ground"></div>
           </div>
         </div>
 
-        <!-- クイックステータス -->
-        <div class="status-grid">
-          <div class="status-card doing">
-            <div class="status-icon"><i data-lucide="play" style="width: 16px; height: 16px;"></i></div>
-            <div class="status-num" id="dash-num-doing">0</div>
-            <div class="status-label">進行中</div>
+        <!-- ▼ 通常時の進捗カード・ステータス (ゲーム時は非表示) ▼ -->
+        <div id="dash-normal-stats">
+          <!-- 今日の進捗カード -->
+          <div class="progress-card">
+            <div class="progress-card-info">
+              <p>今日のタスク</p>
+              <h3 id="dash-task-count">0 件</h3>
+              <p id="dash-task-detail">完了 0件 / 残り 0件</p>
+            </div>
+            <div class="circle-progress">
+              <svg>
+                <circle class="bg" cx="40" cy="40" r="36" />
+                <circle class="bar" cx="40" cy="40" r="36" id="dash-circle-bar" />
+              </svg>
+              <div class="percent" id="dash-circle-percent">0%</div>
+            </div>
           </div>
-          <div class="status-card done">
-            <div class="status-icon"><i data-lucide="check" style="width: 16px; height: 16px;"></i></div>
-            <div class="status-num" id="dash-num-done">0</div>
-            <div class="status-label">完了</div>
-          </div>
-          <div class="status-card overdue">
-            <div class="status-icon"><i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i></div>
-            <div class="status-num" id="dash-num-overdue" style="color: var(--danger-color);">0</div>
-            <div class="status-label">期限切れ</div>
+
+          <!-- クイックステータス -->
+          <div class="status-grid">
+            <div class="status-card doing">
+              <div class="status-icon"><i data-lucide="play" style="width: 16px; height: 16px;"></i></div>
+              <div class="status-num" id="dash-num-doing">0</div>
+              <div class="status-label">進行中</div>
+            </div>
+            <div class="status-card done">
+              <div class="status-icon"><i data-lucide="check" style="width: 16px; height: 16px;"></i></div>
+              <div class="status-num" id="dash-num-done">0</div>
+              <div class="status-label">完了</div>
+            </div>
+            <div class="status-card overdue">
+              <div class="status-icon"><i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i></div>
+              <div class="status-num" id="dash-num-overdue" style="color: var(--danger-color);">0</div>
+              <div class="status-label">期限切れ</div>
+            </div>
           </div>
         </div>
 
         <!-- プロジェクト進捗概要 -->
         <div class="section-header">
-          <h3 class="section-title">プロジェクトの概要</h3>
-          <a href="#" class="section-link" onclick="switchTab('tasks')">すべて見る ></a>
+          <h3 class="section-title" id="dash-section-title">プロジェクトの概要</h3>
+          <a href="#" class="section-link" id="dash-section-link" onclick="switchTab('tasks')">すべて見る ></a>
         </div>
         
         <div class="project-list" id="dash-project-list">
@@ -87,6 +101,11 @@
           <div class="project-card" style="justify-content: center; color: var(--text-muted); font-size: 0.8rem;">
             プロジェクトを読み込み中...
           </div>
+        </div>
+
+        <!-- ▼ ハイスコアリスト (ゲーム時のみ表示) ▼ -->
+        <div class="project-list hidden" id="dash-highscore-list">
+          <!-- JSで動的に追加 -->
         </div>
       </section>
 
@@ -118,7 +137,7 @@
         <h2 class="dashboard-title">AIアシスタント</h2>
         
         <div class="ai-intro">
-          <div class="ai-avatar-large">
+          <div class="ai-avatar-large" id="ai-avatar-icon" onclick="triggerAiWink()" style="cursor: pointer; transition: all 0.3s ease;">
             <i data-lucide="bot" style="width: 36px; height: 36px;"></i>
           </div>
           <h3>こんにちは、AIアシスタントです🤖</h3>
@@ -206,6 +225,22 @@
               <p>スプレッドシート「個人製作」と連動し、データは常にクラウド上に安全に保存されています。</p>
             </div>
           </div>
+
+          <div class="settings-card">
+            <h4>🎨 表示設定</h4>
+            <div class="theme-toggle-row">
+              <span class="theme-toggle-label">
+                <span id="theme-icon">🌙</span>
+                ダークモード
+              </span>
+              <label class="toggle-switch" for="dark-mode-toggle">
+                <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode(this.checked)">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+          </div>
+
         </div>
       </section>
 

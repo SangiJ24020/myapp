@@ -34,6 +34,7 @@ AGENTS.mdの内容はプロダクトの要件に変更がある度に適宜修�
 - ユーザーシート `"users"`：`id`, `email`, `password`, `name`
 - セッションシート `"sessions"`：`user_id`, `token`, `expired_at` (24時間有効)
 - セッション情報の保持には、localStorageとCookieを併用する。
+- 新規登録（サインアップ）：`mode: 'register'`（名前・メール・パスワード）を受け付け、`users` シートに一意のユーザーIDで追加し、同時に初期プロジェクト生成とセッション発行を行う。発表会等での同時登録に備えて `LockService` で排他制御する。
 
 ### 🔮 AIアシスタント機能 (OpenRouter 連携)
 - OpenRouter API を用いてチャットのやり取りを生成する。

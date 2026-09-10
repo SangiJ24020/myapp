@@ -13,15 +13,35 @@
   --accent-light: #fef3c7;
   --danger-color: #ef4444; /* レッド */
   --danger-light: #fee2e2;
-  --bg-color: #f8fafc; /* 超淡いグレー */
+  --bg-color: #f8fafc;
   --card-bg: #ffffff;
-  --text-dark: #0f172a; /* 深いネイビーグレー */
+  --text-dark: #0f172a;
   --text-muted: #64748b;
   --border-color: #e2e8f0;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --font-main: 'Outfit', 'Noto Sans JP', sans-serif;
+}
+
+/* ダークモード変数 */
+[data-theme="dark"] {
+  --primary-color: #818cf8;
+  --primary-light: #1e1b4b;
+  --secondary-color: #34d399;
+  --secondary-light: #064e3b;
+  --accent-color: #fbbf24;
+  --accent-light: #451a03;
+  --danger-color: #f87171;
+  --danger-light: #450a0a;
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-dark: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -39,6 +59,11 @@ body {
   align-items: center;
   min-height: 100vh;
   overflow: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="dark"] body {
+  background-color: #020617;
 }
 
 /* スマホ外枠コンテナ（PC表示時は枠、スマホ表示時は全画面） */
@@ -161,6 +186,52 @@ body {
   margin-bottom: 1rem;
   display: none;
   text-align: center;
+}
+
+.success-message {
+  color: var(--secondary-color);
+  background-color: var(--secondary-light);
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  display: none;
+  text-align: center;
+}
+
+/* 認証タブ (ログイン / 新規登録) */
+.auth-tabs {
+  display: flex;
+  background-color: var(--border-color);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 1.5rem;
+  gap: 4px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-main);
+  text-align: center;
+}
+
+.auth-tab.active {
+  background-color: var(--card-bg);
+  color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-tab:hover:not(.active) {
+  color: var(--text-dark);
 }
 
 /* メインヘッダー */
@@ -499,7 +570,7 @@ body {
 .progress-bar-bg {
   width: 100%;
   height: 6px;
-  background-color: #f1f5f9;
+  background-color: var(--border-color);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -521,7 +592,7 @@ body {
 /* ✅ タスク一覧画面 */
 .filter-tabs {
   display: flex;
-  background-color: #f1f5f9;
+  background-color: var(--border-color);
   padding: 0.25rem;
   border-radius: 12px;
   margin-bottom: 1.25rem;
@@ -540,7 +611,7 @@ body {
 }
 
 .filter-tab.active {
-  background-color: white;
+  background-color: var(--card-bg);
   color: var(--primary-color);
   box-shadow: var(--shadow-sm);
 }
@@ -685,7 +756,7 @@ body {
   margin-bottom: 1rem;
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  background-color: white;
+  background-color: var(--card-bg);
 }
 
 .chat-bubble {
@@ -884,3 +955,234 @@ body {
 .settings-item .val-text {
   color: var(--text-muted);
 }
+
+/* ダーク/ライトモード トグルスイッチ */
+.theme-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.theme-toggle-row:last-child {
+  border-bottom: none;
+}
+
+.theme-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background-color: var(--border-color);
+  border-radius: 999px;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background-color: var(--primary-color);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+.toggle-switch input:checked ~ .toggle-thumb {
+  transform: translateX(22px);
+}
+
+/* ダークモード時の細かい調整 */
+[data-theme="dark"] .form-input {
+  background-color: var(--card-bg);
+  color: var(--text-dark);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .stat-item-box {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .chart-card {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .settings-card {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .phone-container {
+  border-color: #0f172a;
+}
+
+/* 🎮 コナミコマンド イースターエッグ用アニメーション */
+@keyframes konamiFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes konamiBounce {
+  0%   { transform: scale(0.5) translateY(30px); opacity: 0; }
+  60%  { transform: scale(1.1) translateY(-8px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes konamiRainbow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes confettiFall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-15px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-30px) scale(1); opacity: 0; }
+}
+
+/* ============================================================
+   🎮 ミニゲーム画面 (ダッシュボード表示切り替え用)
+   ============================================================ */
+.game-screen {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(to bottom, #7dd3fc, #bae6fd);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+  cursor: pointer;
+  user-select: none;
+}
+
+[data-theme="dark"] .game-screen {
+  background: linear-gradient(to bottom, #1e1b4b, #312e81);
+}
+
+.game-ground {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 40px;
+  background-color: #fcd34d;
+  border-top: 4px solid #f59e0b;
+}
+
+[data-theme="dark"] .game-ground {
+  background-color: #92400e;
+  border-top: 4px solid #78350f;
+}
+
+#game-score {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  z-index: 10;
+}
+
+[data-theme="dark"] #game-score {
+  color: #f8fafc;
+}
+
+#game-msg {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  text-shadow: 1px 1px 0px #fff;
+  z-index: 10;
+  text-align: center;
+}
+
+[data-theme="dark"] #game-msg {
+  color: #f8fafc;
+  text-shadow: 1px 1px 0px #000;
+}
+
+#game-character {
+  position: absolute;
+  left: 30px;
+  bottom: 40px; /* ground height */
+  font-size: 2.5rem;
+  line-height: 1;
+  transition: bottom 0.1s linear;
+  z-index: 5;
+}
+
+#game-obstacle {
+  position: absolute;
+  right: -50px;
+  bottom: 40px;
+  font-size: 2rem;
+  line-height: 1;
+  z-index: 5;
+}
+
+.highscore-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.highscore-rank {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--primary-color);
+  width: 30px;
+}
+
+.highscore-val {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-dark);
+}
+

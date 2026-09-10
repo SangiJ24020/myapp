@@ -11,6 +11,104 @@ let cachedProjects = [];
 let productivityChartInstance = null;
 let statusChartInstance = null;
 
+// ============================================================
+// 🎮 コナミコマンド 隠し要素
+// ============================================================
+const KONAMI_CODE = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let konamiIndex = 0;
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === KONAMI_CODE[konamiIndex]) {
+    konamiIndex++;
+    if (konamiIndex === KONAMI_CODE.length) {
+      konamiIndex = 0;
+      activateKonamiEasterEgg();
+    }
+  } else {
+    konamiIndex = 0;
+  }
+});
+
+function activateKonamiEasterEgg() {
+  // 紙吹雪を生成
+  launchConfetti();
+
+  // オーバーレイメッセージ表示
+  const overlay = document.createElement('div');
+  overlay.id = 'konami-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 99999;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    animation: konamiFadeIn 0.4s ease;
+    cursor: pointer;
+  `;
+  overlay.innerHTML = `
+    <div style="text-align:center; animation: konamiBounce 0.6s ease;">
+      <div style="font-size: 4rem; margin-bottom: 0.5rem;">🎮</div>
+      <div style="
+        font-size: 1.4rem; font-weight: 800;
+        background: linear-gradient(90deg, #f87171, #fb923c, #facc15, #4ade80, #60a5fa, #c084fc);
+        background-size: 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: konamiRainbow 1.5s linear infinite;
+        margin-bottom: 0.75rem;
+        font-family: 'Outfit', sans-serif;
+      ">KONAMI CODE ACTIVATED!</div>
+      <div style="color: white; font-size: 0.95rem; opacity: 0.85; margin-bottom: 0.5rem;">
+        ↑↑↓↓←→←→BA 🎉
+      </div>
+      <div style="color: #fbbf24; font-size: 0.8rem; font-weight: 600;">
+        あなたはこのアプリの秘密を発見した！
+      </div>
+      <div style="color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 1.5rem;">
+        タップして閉じる
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+
+  // 5秒後に自動で閉じる
+  setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 5000);
+}
+
+function launchConfetti() {
+  const COLORS = ['#f87171','#fb923c','#facc15','#4ade80','#60a5fa','#c084fc','#f472b6','#ffffff'];
+  const container = document.body;
+
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    const size = Math.random() * 8 + 5;
+    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const startX = Math.random() * window.innerWidth;
+    const drift = (Math.random() - 0.5) * 200;
+    const duration = Math.random() * 2 + 2;
+    const delay = Math.random() * 1.5;
+    const isCircle = Math.random() > 0.5;
+
+    el.style.cssText = `
+      position: fixed;
+      top: -20px;
+      left: ${startX}px;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${color};
+      border-radius: ${isCircle ? '50%' : '2px'};
+      z-index: 99998;
+      pointer-events: none;
+      animation: confettiFall ${duration}s ${delay}s ease-in forwards;
+      --drift: ${drift}px;
+    `;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), (duration + delay) * 1000 + 100);
+  }
+}
+
+
 function formatLocalDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -48,6 +146,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  // 保存済みテーマの復元
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  applyTheme(savedTheme);
+
   // ユーザー情報の初期表示
   const userName = getCookie('user_name') || 'ユーザー';
   const userEmail = getCookie('user_email') || '';
@@ -68,6 +170,31 @@ window.addEventListener('DOMContentLoaded', async () => {
   // 定期的な同期 (30秒おき)
   setInterval(loadAppData, 30000);
 });
+
+// テーマの適用
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const toggle = document.getElementById('dark-mode-toggle');
+  const icon = document.getElementById('theme-icon');
+
+  if (theme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    if (toggle) toggle.checked = true;
+    if (icon) icon.textContent = '☀️';
+  } else {
+    root.removeAttribute('data-theme');
+    if (toggle) toggle.checked = false;
+    if (icon) icon.textContent = '🌙';
+  }
+}
+
+// ダークモード切り替え
+function toggleDarkMode(isDark) {
+  const theme = isDark ? 'dark' : 'light';
+  localStorage.setItem('theme', theme);
+  applyTheme(theme);
+}
+
 
 // アプリデータのロードと画面更新
 async function loadAppData() {
@@ -608,3 +735,313 @@ function updateReportUI(summary, chartData) {
     }
   });
 }
+
+// ============================================================
+// ✨ AIアイコンウインク機能
+// ============================================================
+function triggerAiWink() {
+  const avatar = document.getElementById('ai-avatar-icon');
+  if (!avatar || avatar.classList.contains('winking')) return;
+  
+  avatar.classList.add('winking');
+  
+  // アイコン全体を少し傾けてピョンと跳ねさせる
+  avatar.style.transform = 'scale(1.1) rotate(-8deg)';
+  
+  // LucideのbotアイコンのSVGから「目」の要素を探してウインク(＜の形)させる
+  const svg = avatar.querySelector('svg');
+  let originalPath = '';
+  let rightEyePath = null;
+  
+  if (svg) {
+    const paths = svg.querySelectorAll('path');
+    paths.forEach(p => {
+      const d = p.getAttribute('d');
+      // d="M15 13v2" が右目のパス
+      if (d && d.includes('M15') && d.includes('13v2')) {
+        rightEyePath = p;
+        originalPath = d; // 元のパスを記憶
+        
+        p.style.transition = 'all 0.1s ease';
+        // ＜ の形 (M16 13 L14 14 L16 15) にパスを書き換える
+        p.setAttribute('d', 'M16 13 L14 14 L16 15');
+      }
+    });
+  }
+  
+  // 浮遊する小さなキラキラを生成
+  const sparkle = document.createElement('div');
+  sparkle.innerHTML = '✨';
+  sparkle.style.cssText = `
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    font-size: 14px;
+    pointer-events: none;
+    animation: floatUp 0.8s ease-out forwards;
+  `;
+  avatar.appendChild(sparkle);
+  
+  // 少し待ってから元の状態に戻す
+  setTimeout(() => {
+    avatar.style.transform = 'scale(1) rotate(0deg)';
+    // パスを元に戻す
+    if (rightEyePath && originalPath) {
+      rightEyePath.setAttribute('d', originalPath);
+    }
+    
+    // アニメーション完了後にクラスを外す
+    setTimeout(() => {
+      avatar.classList.remove('winking');
+    }, 300);
+  }, 400); // まばたきのキープ時間
+}
+
+// ============================================================
+// 🕹️ ミニゲーム (ダッシュボード隠し要素)
+// ============================================================
+let isGameMode = false;
+let dashTitleClickCount = 0;
+let dashTitleClickTimer = null;
+
+// タイトル5回連続タップの検知
+document.addEventListener('DOMContentLoaded', () => {
+  const dashTitle = document.getElementById('dash-title');
+  if (dashTitle) {
+    dashTitle.addEventListener('click', () => {
+      dashTitleClickCount++;
+      clearTimeout(dashTitleClickTimer);
+      
+      if (dashTitleClickCount >= 5) {
+        dashTitleClickCount = 0;
+        toggleGameMode();
+      } else {
+        dashTitleClickTimer = setTimeout(() => {
+          dashTitleClickCount = 0;
+        }, 1000);
+      }
+    });
+  }
+  
+  // キーボード操作 (矢印キー↑ または スペースキーでジャンプ)
+  document.addEventListener('keydown', (e) => {
+    if (isGameMode && (e.code === 'Space' || e.code === 'ArrowUp')) {
+      e.preventDefault();
+      jumpGameCharacter();
+    }
+  });
+});
+
+function toggleGameMode() {
+  isGameMode = !isGameMode;
+  
+  const normalStats = document.getElementById('dash-normal-stats');
+  const gameContainer = document.getElementById('game-container');
+  const dashSectionTitle = document.getElementById('dash-section-title');
+  const dashSectionLink = document.getElementById('dash-section-link');
+  const projectList = document.getElementById('dash-project-list');
+  const highscoreList = document.getElementById('dash-highscore-list');
+  
+  // 中央のタスク追加ボタン
+  const centerNavBtn = document.querySelector('.nav-item-center');
+  
+  if (isGameMode) {
+    // ゲームモード ON
+    normalStats.classList.add('hidden');
+    gameContainer.classList.remove('hidden');
+    
+    dashSectionTitle.innerText = '👑 ハイスコア トップ3';
+    dashSectionLink.classList.add('hidden');
+    projectList.classList.add('hidden');
+    highscoreList.classList.remove('hidden');
+    
+    // ＋ボタンを ▶ ボタンに変更
+    if (centerNavBtn) {
+      centerNavBtn.innerHTML = '<i data-lucide="play"></i>';
+      centerNavBtn.onclick = startGame;
+      lucide.createIcons();
+    }
+    
+    renderHighscores();
+    resetGame();
+  } else {
+    // ゲームモード OFF (通常に戻す)
+    normalStats.classList.remove('hidden');
+    gameContainer.classList.add('hidden');
+    
+    dashSectionTitle.innerText = 'プロジェクトの概要';
+    dashSectionLink.classList.remove('hidden');
+    projectList.classList.remove('hidden');
+    highscoreList.classList.add('hidden');
+    
+    if (centerNavBtn) {
+      centerNavBtn.innerHTML = '<i data-lucide="plus"></i>';
+      centerNavBtn.onclick = openAddTaskModal;
+      lucide.createIcons();
+    }
+    
+    stopGame();
+  }
+}
+
+// ---- ミニゲーム ロジック ----
+let gameTimer = null;
+let gameScore = 0;
+let isJumping = false;
+let charY = 40; // bottom px
+let obsX = 400; // right px
+let isPlaying = false;
+let gameSpeed = 5;
+
+function resetGame() {
+  const msg = document.getElementById('game-msg');
+  const char = document.getElementById('game-character');
+  const obs = document.getElementById('game-obstacle');
+  const scoreEl = document.getElementById('game-score');
+  
+  isPlaying = false;
+  gameScore = 0;
+  charY = 40;
+  obsX = 400;
+  gameSpeed = 5;
+  
+  char.style.bottom = charY + 'px';
+  obs.style.right = 'auto'; // leftベースに変更
+  obs.style.left = obsX + 'px';
+  scoreEl.innerText = 'Score: 0';
+  msg.innerText = '▶ を押してスタート\n(↑キーかタップでジャンプ)';
+  msg.style.display = 'block';
+}
+
+function startGame() {
+  if (isPlaying || !isGameMode) return;
+  isPlaying = true;
+  
+  document.getElementById('game-msg').style.display = 'none';
+  obsX = window.innerWidth > 430 ? 430 : window.innerWidth;
+  gameScore = 0;
+  gameSpeed = 5;
+  
+  if (gameTimer) clearInterval(gameTimer);
+  gameTimer = setInterval(gameLoop, 20);
+}
+
+function stopGame() {
+  isPlaying = false;
+  if (gameTimer) clearInterval(gameTimer);
+}
+
+function jumpGameCharacter() {
+  if (!isPlaying || isJumping) return;
+  isJumping = true;
+  
+  let jumpHeight = 0;
+  const maxJump = 100; // ジャンプの高さを100に調整
+  const jumpTimer = setInterval(() => {
+    if (jumpHeight >= maxJump) {
+      clearInterval(jumpTimer);
+      // 落下
+      const fallTimer = setInterval(() => {
+        if (jumpHeight <= 0) {
+          clearInterval(fallTimer);
+          isJumping = false;
+          charY = 40;
+        } else {
+          jumpHeight -= 6;
+          charY = 40 + jumpHeight;
+        }
+        document.getElementById('game-character').style.bottom = charY + 'px';
+      }, 20);
+    } else {
+      jumpHeight += 8;
+      charY = 40 + jumpHeight;
+    }
+    document.getElementById('game-character').style.bottom = charY + 'px';
+  }, 20);
+}
+
+function gameLoop() {
+  const obs = document.getElementById('game-obstacle');
+  const char = document.getElementById('game-character');
+  const scoreEl = document.getElementById('game-score');
+  
+  // 障害物の移動
+  obsX -= gameSpeed;
+  if (obsX < -40) {
+    // 画面幅 + 0〜300px のランダムな間隔を持たせてリスポーン
+    const baseWidth = window.innerWidth > 430 ? 430 : window.innerWidth;
+    const randomDelay = Math.floor(Math.random() * 300); 
+    obsX = baseWidth + randomDelay;
+    
+    gameScore += 100;
+    scoreEl.innerText = 'Score: ' + gameScore;
+    
+    // スピードアップ
+    if (gameSpeed < 12) {
+      gameSpeed += 0.5;
+    }
+  }
+  obs.style.left = obsX + 'px';
+  
+  // 衝突判定
+  // charの幅は約40, obsの幅は約32 (左端基準)
+  // char Xは常に30付近
+  const charLeft = 30;
+  const charRight = 30 + 35;
+  const obsLeft = obsX;
+  const obsRight = obsX + 30;
+  
+  // Y軸: charYが40の時が地面, obsYは40
+  // もしcharYが obsの高さ(約30)以下なら当たる
+  if (obsLeft < charRight && obsRight > charLeft && charY < 75) {
+    gameOver();
+  }
+}
+
+function gameOver() {
+  stopGame();
+  document.getElementById('game-msg').innerText = 'Game Over\nScore: ' + gameScore;
+  document.getElementById('game-msg').style.display = 'block';
+  
+  saveHighscore(gameScore);
+  renderHighscores();
+}
+
+function saveHighscore(score) {
+  if (score <= 0) return;
+  let scores = JSON.parse(localStorage.getItem('minigame_scores') || '[]');
+  scores.push(score);
+  // 降順ソート
+  scores.sort((a, b) => b - a);
+  // トップ3だけ残す
+  scores = scores.slice(0, 3);
+  localStorage.setItem('minigame_scores', JSON.stringify(scores));
+}
+
+function renderHighscores() {
+  const container = document.getElementById('dash-highscore-list');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const scores = JSON.parse(localStorage.getItem('minigame_scores') || '[]');
+  
+  if (scores.length === 0) {
+    container.innerHTML = '<div class="project-card" style="justify-content: center; color: var(--text-muted); font-size: 0.8rem;">まだスコアがありません</div>';
+    return;
+  }
+  
+  const medals = ['🥇', '🥈', '🥉'];
+  scores.forEach((score, index) => {
+    const card = document.createElement('div');
+    card.className = 'highscore-card';
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div class="highscore-rank">${medals[index]}</div>
+        <div class="highscore-name">ランク ${index + 1}</div>
+      </div>
+      <div class="highscore-val">${score} pts</div>
+    `;
+    container.appendChild(card);
+  });
+}
+

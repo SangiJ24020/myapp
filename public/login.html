@@ -16,8 +16,16 @@
         <p>タスク管理 & AIアシスタント</p>
       </div>
 
-      <div id="error-box" class="error-message"></div>
+      <!-- ログイン / 新規登録 切り替えタブ -->
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">ログイン</button>
+        <button type="button" class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">新規登録</button>
+      </div>
 
+      <div id="error-box" class="error-message"></div>
+      <div id="success-box" class="success-message"></div>
+
+      <!-- ログインフォーム -->
       <form id="login-form" onsubmit="handleLoginSubmit(event)">
         <div class="form-group">
           <label for="email">メールアドレス</label>
@@ -32,12 +40,39 @@
         <button type="submit" id="btn-login" class="btn btn-primary" style="margin-top: 1.5rem;">
           <span>ログイン</span>
         </button>
+
+        <div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+          <p>※ デモ環境用のアカウントが入力されています</p>
+          <p>（管理者: admin@example.com / admin）</p>
+        </div>
       </form>
 
-      <div style="margin-top: 2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
-        <p>※ デモ環境用のアカウントが入力されています</p>
-        <p>（管理者: admin@example.com / admin）</p>
-      </div>
+      <!-- 新規登録フォーム -->
+      <form id="register-form" onsubmit="handleRegisterSubmit(event)" style="display: none;">
+        <div class="form-group">
+          <label for="reg-name">お名前（ニックネーム可）</label>
+          <input type="text" id="reg-name" class="form-input" placeholder="例: 山田 花子" required>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-email">メールアドレス</label>
+          <input type="email" id="reg-email" class="form-input" placeholder="例: hanako@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="reg-password">パスワード (4文字以上)</label>
+          <input type="password" id="reg-password" class="form-input" placeholder="••••••••" minlength="4" required>
+        </div>
+
+        <button type="submit" id="btn-register" class="btn btn-primary" style="margin-top: 1.5rem;">
+          <span>アカウント作成して始める</span>
+        </button>
+
+        <div style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+          <p>登録完了後、すぐにタスク管理をお試しいただけます ✨</p>
+        </div>
+      </form>
+
     </div>
   </div>
 
@@ -47,6 +82,32 @@
       window.location.href = 'app.html';
     }
 
+    // タブ切り替え関数
+    function switchAuthTab(mode) {
+      const tabLogin = document.getElementById('tab-login');
+      const tabRegister = document.getElementById('tab-register');
+      const formLogin = document.getElementById('login-form');
+      const formRegister = document.getElementById('register-form');
+      const errorBox = document.getElementById('error-box');
+      const successBox = document.getElementById('success-box');
+
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+
+      if (mode === 'login') {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        formLogin.style.display = 'block';
+        formRegister.style.display = 'none';
+      } else {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        formRegister.style.display = 'block';
+        formLogin.style.display = 'none';
+      }
+    }
+
+    // ログイン処理
     async function handleLoginSubmit(event) {
       event.preventDefault();
       
@@ -85,6 +146,71 @@
       } finally {
         btnLogin.disabled = false;
         btnLogin.innerHTML = '<span>ログイン</span>';
+      }
+    }
+
+    // 新規登録処理
+    async function handleRegisterSubmit(event) {
+      event.preventDefault();
+
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value.trim();
+      const errorBox = document.getElementById('error-box');
+      const successBox = document.getElementById('success-box');
+      const btnRegister = document.getElementById('btn-register');
+
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+
+      if (!name || !email || !password) {
+        errorBox.innerText = 'すべての項目を入力してください。';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      if (password.length < 4) {
+        errorBox.innerText = 'パスワードは4文字以上で設定してください。';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      btnRegister.disabled = true;
+      btnRegister.innerHTML = '<span>アカウント作成中...</span>';
+
+      try {
+        const res = await requestGas({
+          mode: 'register',
+          name: name,
+          email: email,
+          password: password
+        });
+
+        if (res.status === 'success') {
+          successBox.innerText = 'アカウントが作成されました！画面を移動します...';
+          successBox.style.display = 'block';
+
+          // セッション情報を保存 (24時間)
+          setCookie('session_token', res.token, 24);
+          setCookie('user_name', res.user.name, 24);
+          setCookie('user_email', res.user.email, 24);
+
+          // 短い待ち時間を入れてapp.htmlへ
+          setTimeout(() => {
+            window.location.href = 'app.html';
+          }, 800);
+        } else {
+          errorBox.innerText = res.message || 'アカウント作成に失敗しました。';
+          errorBox.style.display = 'block';
+          btnRegister.disabled = false;
+          btnRegister.innerHTML = '<span>アカウント作成して始める</span>';
+        }
+      } catch (err) {
+        console.error(err);
+        errorBox.innerText = 'サーバーとの通信に失敗しました。GASのデプロイURLが正しいか確認してください。';
+        errorBox.style.display = 'block';
+        btnRegister.disabled = false;
+        btnRegister.innerHTML = '<span>アカウント作成して始める</span>';
       }
     }
   </script>

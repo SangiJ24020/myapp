@@ -262,6 +262,8 @@ function doGet(e) {
   try {
     if (mode === 'login') {
       return createJsonResponse(handleLogin(e.parameter.email, e.parameter.password));
+    } else if (mode === 'register') {
+      return createJsonResponse(handleRegister(e.parameter.name, e.parameter.email, e.parameter.password));
     } else if (mode === 'checkSession') {
       return createJsonResponse(handleCheckSession(e.parameter.token));
     } else if (mode === 'getTasks') {
@@ -316,7 +318,9 @@ function doPost(e) {
   }
 
   try {
-    if (mode === 'saveTask') {
+    if (mode === 'register') {
+      return createJsonResponse(handleRegister(e.parameter.name, e.parameter.email, e.parameter.password));
+    } else if (mode === 'saveTask') {
       return createJsonResponse(handleSaveTask(e.parameter.token, e.parameter.id, e.parameter.title, e.parameter.project_id, e.parameter.status, e.parameter.due_date));
     } else if (mode === 'deleteTask') {
       return createJsonResponse(handleDeleteTask(e.parameter.token, e.parameter.id));
@@ -330,6 +334,69 @@ function doPost(e) {
     return createJsonResponse({ status: 'error', message: '無効なmode: ' + mode });
   } catch (err) {
     return createJsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+// ユーザー新規登録
+function handleRegister(name, email, password) {
+  if (!name || !email || !password) {
+    return { status: 'error', message: '未入力項目があります。' };
+  }
+
+  const trimmedEmail = email.trim();
+  const trimmedName = name.trim();
+  const trimmedPassword = password.trim();
+
+  if (trimmedPassword.length < 4) {
+    return { status: 'error', message: 'パスワードは4文字以上で設定してください。' };
+  }
+
+  // デモアカウントとの重複防止
+  if (trimmedEmail.toLowerCase() === 'admin@example.com') {
+    return { status: 'error', message: 'このメールアドレスは既に使用されています。' };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    // 同時登録競合を防ぐため最大30秒ロック待機
+    lock.waitLock(30000);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const usersSheet = ss.getSheetByName('users');
+    const data = usersSheet.getDataRange().getValues();
+
+    // 既存メールアドレスとの重複チェック
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1] && data[i][1].toString().trim().toLowerCase() === trimmedEmail.toLowerCase()) {
+        return { status: 'error', message: 'このメールアドレスは既に登録されています。' };
+      }
+    }
+
+    // 新規ユーザー追加 (user-xxxxxxxx)
+    const newUserId = 'user-' + Utilities.getUuid().substring(0, 8);
+    usersSheet.appendRow([newUserId, trimmedEmail, trimmedPassword, trimmedName]);
+
+    // ユーザー用初期プロジェクトの自動生成
+    ensureUserProjects(newUserId);
+
+    // セッションの作成（登録完了と同時にログイン状態へ）
+    const sessionsSheet = ss.getSheetByName('sessions');
+    const token = generateToken();
+    const expiredAt = new Date();
+    expiredAt.setHours(expiredAt.getHours() + 24);
+    sessionsSheet.appendRow([newUserId, token, expiredAt]);
+
+    return {
+      status: 'success',
+      token: token,
+      user: { name: trimmedName, email: trimmedEmail }
+    };
+  } catch (err) {
+    return { status: 'error', message: '登録処理中にエラーが発生しました: ' + err.toString() };
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (e) {}
   }
 }
 
@@ -523,18 +590,36 @@ function handleGetProjects(token) {
   ensureUserProjects(session.userId);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tasksSheet = ss.getSheetByName('tasks');
+  const tasksData = tasksSheet.getDataRange().getValues();
   const projectsSheet = ss.getSheetByName('projects');
-  const data = projectsSheet.getDataRange().getValues();
+  const projectsData = projectsSheet.getDataRange().getValues();
   const projects = [];
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][5] && data[i][5].toString() === session.userId) {
+  for (let i = 1; i < projectsData.length; i++) {
+    const row = projectsData[i];
+    if (row[5] && row[5].toString() === session.userId) {
+      const projId = row[0].toString();
+
+      // このプロジェクトに属するタスクを集計
+      let projTotal = 0;
+      let projDone = 0;
+      for (let j = 1; j < tasksData.length; j++) {
+        const t = tasksData[j];
+        if (t[6] && t[6].toString() === session.userId && t[2] && t[2].toString() === projId) {
+          projTotal++;
+          if (t[3] && t[3].toString() === 'done') projDone++;
+        }
+      }
+
+      const calcProgress = projTotal > 0 ? Math.round((projDone / projTotal) * 100) : 0;
+
       projects.push({
-        id: data[i][0].toString(),
-        name: data[i][1].toString(),
-        color: data[i][2].toString(),
-        status: data[i][3].toString(),
-        progress: Number(data[i][4] || 0)
+        id: projId,
+        name: row[1].toString(),
+        color: row[2].toString(),
+        status: row[3].toString(),
+        progress: calcProgress
       });
     }
   }
@@ -731,17 +816,32 @@ function handleGetReport(token) {
     }
   }
 
-  // プロジェクト進捗の取得
+  // プロジェクト進捗の取得 (タスクの完了率から自動計算)
   const projects = [];
   for (let i = 1; i < projectsData.length; i++) {
     const row = projectsData[i];
     if (row[5] && row[5].toString() === session.userId) {
+      const projId = row[0].toString();
+
+      // このプロジェクトに属するタスクを集計
+      let projTotal = 0;
+      let projDone = 0;
+      for (let j = 1; j < tasksData.length; j++) {
+        const t = tasksData[j];
+        if (t[6] && t[6].toString() === session.userId && t[2] && t[2].toString() === projId) {
+          projTotal++;
+          if (t[3] && t[3].toString() === 'done') projDone++;
+        }
+      }
+
+      const calcProgress = projTotal > 0 ? Math.round((projDone / projTotal) * 100) : 0;
+
       projects.push({
-        id: row[0].toString(),
+        id: projId,
         name: row[1].toString(),
         color: row[2].toString(),
         status: row[3].toString(),
-        progress: Number(row[4] || 0)
+        progress: calcProgress
       });
     }
   }
