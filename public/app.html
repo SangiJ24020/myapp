@@ -2,18 +2,20 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>J24020のアプリ</title>
   <link rel="stylesheet" href="style.css">
   <script src="utils.js"></script>
   <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
   <!-- Lucide アイコン CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@latest" defer></script>
 </head>
 <body>
 
   <div class="phone-container">
+    <!-- 読み込みインジケーター (上部プログレスバー) -->
+    <div id="global-loader" class="global-loader"></div>
     
     <!-- 1. アプリ共通ヘッダー -->
     <header class="app-header">

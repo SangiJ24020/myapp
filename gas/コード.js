@@ -2,8 +2,13 @@
 // GAS バックエンド: 「個人製作」タスク管理アプリ (myapp)
 // ============================================================
 
-// シートの初期化処理
+// シートの初期化処理（キャッシュにより毎リクエストの不要な走査をスキップして高速化）
 function initSheets() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('sheets_initialized') === 'true') {
+    return;
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // users シート
@@ -63,6 +68,11 @@ function initSheets() {
     messagesSheet = ss.insertSheet('messages');
     messagesSheet.appendRow(['user_id', 'type', 'text', 'create_at']);
   }
+
+  // 初期化完了を6時間キャッシュ（毎リクエストの不要な走査をスキップ）
+  try {
+    cache.put('sheets_initialized', 'true', 21600);
+  } catch (e) {}
 }
 
 // トークン生成
@@ -266,6 +276,8 @@ function doGet(e) {
       return createJsonResponse(handleRegister(e.parameter.name, e.parameter.email, e.parameter.password));
     } else if (mode === 'checkSession') {
       return createJsonResponse(handleCheckSession(e.parameter.token));
+    } else if (mode === 'getInitialData') {
+      return createJsonResponse(handleGetInitialData(e.parameter.token));
     } else if (mode === 'getTasks') {
       return createJsonResponse(handleGetTasks(e.parameter.token));
     } else if (mode === 'getProjects') {
@@ -449,6 +461,141 @@ function handleLogin(email, password) {
   };
 }
 
+// アプリ起動時の初期データを一括取得（タスク一覧・プロジェクト・統計レポートを1回の通信で返却）
+function handleGetInitialData(token) {
+  const session = handleCheckSession(token);
+  if (session.status === 'error') return session;
+
+  // ユーザーのプロジェクト情報を最新の5項目に同期
+  ensureUserProjects(session.userId);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tasksSheet = ss.getSheetByName('tasks');
+  const projectsSheet = ss.getSheetByName('projects');
+
+  const tasksData = tasksSheet.getDataRange().getValues();
+  const projectsData = projectsSheet.getDataRange().getValues();
+  const todayStr = formatDateOnly(new Date());
+
+  const tasks = [];
+  let totalTasks = 0;
+  let completedTasks = 0;
+  let inProgressTasks = 0;
+  let overdueTasks = 0;
+
+  // 週別の統計データ用 (過去7日間)
+  const last7Days = [];
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = formatDateOnly(d);
+    last7Days.push({
+      dateStr: dateStr,
+      label: (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')',
+      count: 0
+    });
+  }
+
+  // プロジェクトごとのタスク数集計用マップ
+  const projectTaskStats = {};
+
+  // タスク一覧抽出 & レポート統計集計
+  for (let i = 1; i < tasksData.length; i++) {
+    const row = tasksData[i];
+    if (row[6] && row[6].toString() === session.userId) {
+      const taskId = row[0].toString();
+      const title = row[1].toString();
+      const projId = row[2].toString();
+      const status = row[3].toString();
+      const rawValue = row[4];
+      const dueDate = formatDateOnly(rawValue);
+      const rawValueStr = rawValue ? rawValue.toString().trim() : '';
+      const isAlreadyFormatted = /^\d{4}-\d{2}-\d{2}$/.test(rawValueStr);
+
+      if (rawValueStr && !isAlreadyFormatted) {
+        setTaskDueDate(tasksSheet, i + 1, dueDate);
+      }
+
+      tasks.push({
+        id: taskId,
+        title: title,
+        project_id: projId,
+        status: status,
+        due_date: dueDate,
+        create_at: row[5] ? new Date(row[5]).toISOString() : ''
+      });
+
+      totalTasks++;
+
+      // プロジェクト別集計
+      if (!projectTaskStats[projId]) {
+        projectTaskStats[projId] = { total: 0, done: 0 };
+      }
+      projectTaskStats[projId].total++;
+
+      if (status === 'done') {
+        completedTasks++;
+        projectTaskStats[projId].done++;
+
+        // 過去7日間の完了タスクをマッピング
+        const compDateStr = formatDateOnly(row[4]);
+        const matchedDay = last7Days.find(item => item.dateStr === compDateStr);
+        if (matchedDay) {
+          matchedDay.count++;
+        }
+      } else {
+        inProgressTasks++;
+        if (dueDate && dueDate < todayStr) {
+          overdueTasks++;
+        }
+      }
+    }
+  }
+
+  // プロジェクト一覧作成 & 進捗計算
+  const projects = [];
+  for (let i = 1; i < projectsData.length; i++) {
+    const row = projectsData[i];
+    if (row[5] && row[5].toString() === session.userId) {
+      const projId = row[0].toString();
+      const stats = projectTaskStats[projId] || { total: 0, done: 0 };
+      const calcProgress = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+
+      projects.push({
+        id: projId,
+        name: row[1].toString(),
+        color: row[2].toString(),
+        status: row[3].toString(),
+        progress: calcProgress,
+        taskCount: stats.total,
+        doneCount: stats.done
+      });
+    }
+  }
+
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  return {
+    status: 'success',
+    user: session.user,
+    userId: session.userId,
+    tasks: tasks,
+    projects: projects,
+    summary: {
+      total: totalTasks,
+      completed: completedTasks,
+      inProgress: inProgressTasks,
+      overdue: overdueTasks,
+      rate: completionRate
+    },
+    chartData: {
+      labels: last7Days.map(item => item.label),
+      values: last7Days.map(item => item.count)
+    }
+  };
+}
+
 // タスク取得
 function handleGetTasks(token) {
   const session = handleCheckSession(token);
@@ -619,7 +766,9 @@ function handleGetProjects(token) {
         name: row[1].toString(),
         color: row[2].toString(),
         status: row[3].toString(),
-        progress: calcProgress
+        progress: calcProgress,
+        taskCount: projTotal,
+        doneCount: projDone
       });
     }
   }
@@ -841,7 +990,9 @@ function handleGetReport(token) {
         name: row[1].toString(),
         color: row[2].toString(),
         status: row[3].toString(),
-        progress: calcProgress
+        progress: calcProgress,
+        taskCount: projTotal,
+        doneCount: projDone
       });
     }
   }

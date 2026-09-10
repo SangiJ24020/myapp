@@ -58,6 +58,7 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -71,6 +72,7 @@ body {
   width: 100%;
   max-width: 430px;
   height: 100vh;
+  height: 100dvh;
   max-height: 880px;
   background-color: var(--bg-color);
   box-shadow: var(--shadow-lg);
@@ -85,12 +87,57 @@ body {
 @media (max-width: 450px) {
   body {
     background-color: var(--bg-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
   }
   .phone-container {
-    max-height: 100vh;
+    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
     border: none;
   }
+}
+
+/* グローバル読み込みインジケーター */
+.global-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: transparent;
+  z-index: 9999;
+  overflow: hidden;
+  display: none;
+}
+
+.global-loader.loading {
+  display: block;
+}
+
+.global-loader::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  border-radius: 3px;
+  animation: globalLoaderAnim 1.2s infinite ease-in-out;
+}
+
+@keyframes globalLoaderAnim {
+  0% { left: -40%; width: 25%; }
+  50% { left: 35%; width: 50%; }
+  100% { left: 100%; width: 25%; }
 }
 
 /* ログイン画面用のスタイル */
@@ -303,8 +350,9 @@ body {
 .app-content {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 1.25rem 1.5rem;
-  padding-bottom: 5rem; /* ナビ用の余白 */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); /* 下部ナビとセーフエリア分の余白 */
 }
 
 /* 非表示設定 */
@@ -318,28 +366,34 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 70px;
+  height: calc(65px + env(safe-area-inset-bottom, 0px));
   background-color: var(--card-bg);
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 0 1rem;
-  z-index: 100;
+  padding: 0 0.5rem env(safe-area-inset-bottom, 0px) 0.5rem;
+  z-index: 500;
+  box-sizing: border-box;
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 0.7rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  width: 60px;
+  min-width: 54px;
+  height: 100%;
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .nav-item svg {
@@ -586,7 +640,8 @@ body {
   font-weight: 600;
   color: var(--text-muted);
   text-align: right;
-  min-width: 35px;
+  min-width: 42px;
+  white-space: nowrap;
 }
 
 /* ✅ タスク一覧画面 */
@@ -880,7 +935,7 @@ body {
   bottom: 0;
   background-color: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(2px);
-  z-index: 1000;
+  z-index: 2000;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -893,6 +948,7 @@ body {
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
   padding: 1.5rem;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1);
   transform: translateY(100%);
   transition: transform 0.3s ease;

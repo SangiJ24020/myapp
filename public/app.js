@@ -123,19 +123,153 @@ function parseDateOnly(dateStr) {
   return new Date(year, month - 1, day);
 }
 
-async function syncProjects() {
-  const projectRes = await requestGas({
-    mode: 'getProjects',
-    token: sessionToken
+// ローディング表示制御
+function setGlobalLoading(isLoading) {
+  const loader = document.getElementById('global-loader');
+  if (loader) {
+    if (isLoading) {
+      loader.classList.add('loading');
+    } else {
+      loader.classList.remove('loading');
+    }
+  }
+}
+
+let isLoadingData = false;
+
+// ============================================================
+// ⚡ ローカルキャッシュ管理 (Stale-While-Revalidate: 体感0秒化)
+// ============================================================
+const CACHE_KEY_TASKS = 'myapp_tasks_cache';
+const CACHE_KEY_PROJECTS = 'myapp_projects_cache';
+const CACHE_KEY_SUMMARY = 'myapp_summary_cache';
+const CACHE_KEY_CHART = 'myapp_chart_cache';
+
+// ローカルストレージにキャッシュ保存
+function saveToLocalCache(tasks, projects, summary, chartData) {
+  try {
+    if (tasks) localStorage.setItem(CACHE_KEY_TASKS, JSON.stringify(tasks));
+    if (projects) localStorage.setItem(CACHE_KEY_PROJECTS, JSON.stringify(projects));
+    if (summary) localStorage.setItem(CACHE_KEY_SUMMARY, JSON.stringify(summary));
+    if (chartData) localStorage.setItem(CACHE_KEY_CHART, JSON.stringify(chartData));
+  } catch (e) {
+    console.warn('ローカルキャッシュの保存に失敗しました:', e);
+  }
+}
+
+// ローカルキャッシュから即時復元（スマホで開いた瞬間に画面を表示！）
+function restoreFromLocalCache() {
+  try {
+    const rawTasks = localStorage.getItem(CACHE_KEY_TASKS);
+    const rawProjects = localStorage.getItem(CACHE_KEY_PROJECTS);
+    const rawSummary = localStorage.getItem(CACHE_KEY_SUMMARY);
+    const rawChart = localStorage.getItem(CACHE_KEY_CHART);
+
+    let hasCache = false;
+
+    if (rawTasks) {
+      cachedTasks = JSON.parse(rawTasks);
+      renderTaskList();
+      hasCache = true;
+    }
+
+    if (rawProjects) {
+      cachedProjects = JSON.parse(rawProjects);
+      // タスクデータに基づきプロジェクト進捗率を最新計算
+      recalculateProjectProgress();
+      updateProjectSelect();
+      hasCache = true;
+    }
+
+    if (rawSummary) {
+      const summary = JSON.parse(rawSummary);
+      updateDashboardUI(summary, cachedProjects);
+      if (rawChart) {
+        updateReportUI(summary, JSON.parse(rawChart));
+      }
+      hasCache = true;
+    } else if (hasCache) {
+      recalculateSummaryFromCache();
+    }
+
+    safeCreateIcons();
+    return hasCache;
+  } catch (e) {
+    console.warn('ローカルキャッシュの復元に失敗しました:', e);
+    return false;
+  }
+}
+
+// Lucideアイコンの安全実行（defer読み込み対応）
+function safeCreateIcons() {
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+// プロジェクトごとの進捗率を cachedTasks から動的に再計算する（リアルタイム連動）
+function recalculateProjectProgress() {
+  if (!cachedProjects || cachedProjects.length === 0) return;
+
+  const projectStats = {};
+  cachedProjects.forEach(p => {
+    projectStats[p.id] = { total: 0, done: 0 };
   });
 
-  if (projectRes.status === 'success') {
-    cachedProjects = projectRes.projects || [];
-    return true;
-  }
+  cachedTasks.forEach(t => {
+    if (t.project_id) {
+      if (!projectStats[t.project_id]) {
+        projectStats[t.project_id] = { total: 0, done: 0 };
+      }
+      projectStats[t.project_id].total++;
+      if (t.status === 'done') {
+        projectStats[t.project_id].done++;
+      }
+    }
+  });
 
-  console.warn('プロジェクト情報の同期に失敗しました:', projectRes.message);
-  return false;
+  cachedProjects.forEach(p => {
+    const stats = projectStats[p.id];
+    p.taskCount = stats ? stats.total : 0;
+    p.doneCount = stats ? stats.done : 0;
+    p.progress = stats && stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+  });
+}
+
+// キャッシュからローカル統計およびプロジェクト進捗を再計算して即時UI反映（超高速＆リアルタイム連動）
+function recalculateSummaryFromCache() {
+  const total = cachedTasks.length;
+  let completed = 0;
+  let inProgress = 0;
+  let overdue = 0;
+  const todayStr = formatLocalDate(new Date());
+
+  // プロジェクト進捗率をタスクから自動再計算
+  recalculateProjectProgress();
+
+  cachedTasks.forEach(t => {
+    if (t.status === 'done') {
+      completed++;
+    } else {
+      inProgress++;
+      if (t.due_date && t.due_date < todayStr) {
+        overdue++;
+      }
+    }
+  });
+
+  const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const summary = {
+    total: total,
+    completed: completed,
+    inProgress: inProgress,
+    overdue: overdue,
+    rate: rate
+  };
+
+  updateDashboardUI(summary, cachedProjects);
+  renderTaskList();
+  saveToLocalCache(cachedTasks, cachedProjects, summary, null);
 }
 
 // ドキュメント読み込み時の処理
@@ -158,17 +292,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('settings-name').innerText = userName;
   document.getElementById('settings-email').innerText = userEmail;
 
-  // Lucide アイコンの初期化
-  lucide.createIcons();
+  // 1. ローカルキャッシュから0.1秒で即時復元（体感0秒で前回の画面が出現！）
+  const hasCache = restoreFromLocalCache();
 
-  // アプリデータのロード
-  await loadAppData();
+  // 2. アイコン初期化（defer遅延にも対応）
+  safeCreateIcons();
+  window.addEventListener('load', safeCreateIcons);
 
-  // AIメッセージ履歴のロード
-  await loadAiMessages();
+  // 3. アプリデータのロード（キャッシュがあれば全画面ローダーを出さず静かに裏で同期）
+  await loadAppData(!hasCache);
 
-  // 定期的な同期 (30秒おき)
-  setInterval(loadAppData, 30000);
+  // AIメッセージ履歴はバックグラウンドで非同期ロード（画面表示をブロックしない）
+  loadAiMessages();
+
+  // 定期的な同期 (60秒おき・静かに同期)
+  setInterval(() => {
+    loadAppData(false);
+  }, 60000);
 });
 
 // テーマの適用
@@ -195,42 +335,68 @@ function toggleDarkMode(isDark) {
   applyTheme(theme);
 }
 
-
-// アプリデータのロードと画面更新
-async function loadAppData() {
-  if (!sessionToken) return;
+// アプリデータのロードと画面更新 (一本化API + フォールバック + SWR)
+async function loadAppData(showLoader = true) {
+  if (!sessionToken || isLoadingData) return;
+  isLoadingData = true;
+  if (showLoader) setGlobalLoading(true);
 
   try {
-    // 統計データとプロジェクト・タスクの取得
-    const res = await requestGas({
-      mode: 'getReport',
-      token: sessionToken
-    });
+    let res = null;
 
-    if (res.status === 'success') {
-      cachedProjects = res.projects || [];
-      await syncProjects();
-      
-      // タスクリストの取得
-      const taskRes = await requestGas({
-        mode: 'getTasks',
-        token: sessionToken
-      });
-      if (taskRes.status === 'success') {
-        cachedTasks = taskRes.tasks || [];
+    // 1. まずは超高速な一本化エンドポイント (getInitialData) を試行（1往復で全取得）
+    try {
+      res = await requestGas({ mode: 'getInitialData', token: sessionToken });
+    } catch (e) {
+      console.warn('getInitialDataの呼び出しに失敗、フォールバックを実行します:', e);
+    }
+
+    // 2. フォールバック（旧GASバージョンやエラー時は従来どおり2並列取得）
+    if (!res || res.status !== 'success' || !res.tasks) {
+      const [reportRes, taskRes] = await Promise.all([
+        requestGas({ mode: 'getReport', token: sessionToken }),
+        requestGas({ mode: 'getTasks', token: sessionToken })
+      ]);
+      if (reportRes && reportRes.status === 'success') {
+        res = {
+          status: 'success',
+          tasks: taskRes?.tasks || [],
+          projects: reportRes.projects || [],
+          summary: reportRes.summary,
+          chartData: reportRes.chartData
+        };
+      } else if (reportRes && reportRes.status === 'error' && reportRes.message && reportRes.message.includes('セッション')) {
+        console.warn('セッションが無効です。ログイン画面へ遷移します。');
+        handleLogout();
+        return;
       }
+    }
 
-      // ダッシュボード・レポートの更新
+    if (res && res.status === 'success') {
+      cachedProjects = res.projects || [];
+      cachedTasks = res.tasks || [];
+
+      // スプレッドシートの古い固定値に影響されないようタスクから動的に進捗率を最新同期
+      recalculateProjectProgress();
+
+      // ローカルストレージに最新状態をキャッシュ保存（次回の起動が体感0秒に！）
+      saveToLocalCache(cachedTasks, cachedProjects, res.summary, res.chartData);
+
+      // ダッシュボード・レポート・タスク一覧の更新
       updateDashboardUI(res.summary, cachedProjects);
       updateReportUI(res.summary, res.chartData);
       renderTaskList();
       updateProjectSelect();
-    } else {
+      safeCreateIcons();
+    } else if (res && res.status === 'error' && res.message && res.message.includes('セッション')) {
       console.warn('セッションが無効です。ログイン画面へ遷移します。');
       handleLogout();
     }
   } catch (err) {
     console.error('データ取得エラー:', err);
+  } finally {
+    isLoadingData = false;
+    if (showLoader) setGlobalLoading(false);
   }
 }
 
@@ -247,14 +413,14 @@ function switchTab(tabId) {
   document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
   document.getElementById(`view-${tabId}`).classList.remove('hidden');
 
-  // タスクタブが選択されたら再描画
+  // タスクタブが選択されたらキャッシュから即時描画
   if (tabId === 'tasks') {
     renderTaskList();
   }
   
-  // 分析タブが選択されたらグラフのリサイズと再描画
+  // 分析タブが選択されたら裏で静かに同期
   if (tabId === 'report') {
-    loadAppData();
+    loadAppData(false);
   }
 }
 
@@ -268,6 +434,12 @@ function handleLogout() {
   deleteCookie('session_token');
   deleteCookie('user_name');
   deleteCookie('user_email');
+  try {
+    localStorage.removeItem(CACHE_KEY_TASKS);
+    localStorage.removeItem(CACHE_KEY_PROJECTS);
+    localStorage.removeItem(CACHE_KEY_SUMMARY);
+    localStorage.removeItem(CACHE_KEY_CHART);
+  } catch (e) {}
   window.location.href = 'login.html';
 }
 
@@ -303,6 +475,11 @@ function updateDashboardUI(summary, projects) {
   }
 
   projects.forEach(proj => {
+    // このプロジェクトに紐づくタスク件数を算出
+    const taskCount = proj.taskCount !== undefined 
+      ? proj.taskCount 
+      : cachedTasks.filter(t => t.project_id === proj.id).length;
+
     const card = document.createElement('div');
     card.className = 'project-card';
     card.innerHTML = `
@@ -312,10 +489,10 @@ function updateDashboardUI(summary, projects) {
       <div class="project-details">
         <h4>${proj.name}</h4>
         <div class="progress-bar-bg">
-          <div class="progress-bar-fill" style="width: ${proj.progress}%; background-color: ${proj.color || '#6366f1'};"></div>
+          <div class="progress-bar-fill" style="width: ${proj.progress || 0}%; background-color: ${proj.color || '#6366f1'};"></div>
         </div>
       </div>
-      <div class="project-percent">${proj.progress}%</div>
+      <div class="project-percent" title="タスク数">${taskCount}個</div>
     `;
     projList.appendChild(card);
   });
@@ -432,17 +609,18 @@ function formatDateLabel(dateStr) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-// タスク完了のトグルスイッチ
+// タスク完了のトグルスイッチ (体感0秒の楽観的UI更新)
 async function toggleTaskDone(taskId, currentStatus) {
   const newStatus = currentStatus === 'done' ? 'todo' : 'done';
   const task = cachedTasks.find(t => t.id === taskId);
   if (!task) return;
 
-  // 画面の即時反映 (楽観的更新)
+  // 画面と統計を即座にローカル更新 (止まらない！)
   task.status = newStatus;
-  renderTaskList();
+  recalculateSummaryFromCache();
 
   try {
+    setGlobalLoading(true);
     const res = await requestGasPost({
       mode: 'saveTask',
       token: sessionToken,
@@ -456,15 +634,15 @@ async function toggleTaskDone(taskId, currentStatus) {
     if (res.status !== 'success') {
       // 失敗時はロールバック
       task.status = currentStatus;
-      renderTaskList();
+      recalculateSummaryFromCache();
       alert('タスクの更新に失敗しました。');
-    } else {
-      await loadAppData();
     }
   } catch (err) {
     task.status = currentStatus;
-    renderTaskList();
+    recalculateSummaryFromCache();
     console.error(err);
+  } finally {
+    setGlobalLoading(false);
   }
 }
 
@@ -509,19 +687,43 @@ function closeTaskModal(e) {
   setTimeout(() => overlay.style.display = 'none', 300);
 }
 
-// タスク保存の実行
+// タスク保存の実行 (楽観的UI更新)
 async function saveTaskData(event) {
   event.preventDefault();
 
   const id = document.getElementById('task-id').value;
-  const title = document.getElementById('task-title').value;
+  const title = document.getElementById('task-title').value.trim();
   const projectId = document.getElementById('task-project').value;
   const status = document.getElementById('task-status').value;
   const dueDate = document.getElementById('task-due').value;
 
   closeTaskModal();
 
+  // 画面への即時反映 (待たずにすぐ表示！)
+  if (id) {
+    const existing = cachedTasks.find(t => t.id === id);
+    if (existing) {
+      existing.title = title;
+      existing.project_id = projectId;
+      existing.status = status;
+      existing.due_date = dueDate;
+    }
+  } else {
+    // 一時タスクをリスト先頭に追加
+    const tempTask = {
+      id: 'temp-' + Date.now(),
+      title: title,
+      project_id: projectId,
+      status: status,
+      due_date: dueDate,
+      create_at: new Date().toISOString()
+    };
+    cachedTasks.unshift(tempTask);
+  }
+  recalculateSummaryFromCache();
+
   try {
+    setGlobalLoading(true);
     const res = await requestGasPost({
       mode: 'saveTask',
       token: sessionToken,
@@ -533,17 +735,22 @@ async function saveTaskData(event) {
     });
 
     if (res.status === 'success') {
-      await loadAppData();
+      // 静かに裏で同期して正式なIDを取得
+      loadAppData(false);
     } else {
       alert('タスクの保存に失敗しました: ' + res.message);
+      loadAppData(false);
     }
   } catch (err) {
     console.error(err);
     alert('保存中に通信エラーが発生しました。');
+    loadAppData(false);
+  } finally {
+    setGlobalLoading(false);
   }
 }
 
-// タスク削除の実行
+// タスク削除の実行 (楽観的UI更新)
 async function deleteTaskData() {
   const id = document.getElementById('task-id').value;
   if (!id) return;
@@ -552,7 +759,12 @@ async function deleteTaskData() {
 
   closeTaskModal();
 
+  // 画面から即座に削除 (待たずにすぐ消える！)
+  cachedTasks = cachedTasks.filter(t => t.id !== id);
+  recalculateSummaryFromCache();
+
   try {
+    setGlobalLoading(true);
     const res = await requestGasPost({
       mode: 'deleteTask',
       token: sessionToken,
@@ -560,13 +772,17 @@ async function deleteTaskData() {
     });
 
     if (res.status === 'success') {
-      await loadAppData();
+      loadAppData(false);
     } else {
       alert('タスクの削除に失敗しました: ' + res.message);
+      loadAppData(false);
     }
   } catch (err) {
     console.error(err);
     alert('削除中に通信エラーが発生しました。');
+    loadAppData(false);
+  } finally {
+    setGlobalLoading(false);
   }
 }
 
